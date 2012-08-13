@@ -1,0 +1,298 @@
+local baseShell = shell
+local pwd = (baseShell and baseShell.dir()) or ''
+local binPaths = '.:/rom/programs'
+
+local KEYS = {
+    TAB = 15,
+    ENTER = 28,
+    LCTRL = 29,
+    RCTRL = 157,
+    BACKSPACE = 14
+}
+
+local pathutils = { }
+function pathutils.isAbsolute(path)
+    return string.sub(path, 1, 1) == '/'
+end
+
+-- fs.combine-like function which doesn't mess with things too much
+function pathutils.combine(a, b)
+    if string.sub(a, -1) == '/' then
+        a = string.sub(a, 1, #a - 1)
+    end
+
+    if string.sub(b, 1) == '/' then
+        b = string.sub(b, 2)
+    end
+
+    return a .. '/' .. b
+end
+
+-- return directory part of a path
+function pathutils.dirpart(path)
+    -- special case for root
+    if path == '/' then
+        return '/'
+    end
+
+    local parts = { }
+    for p in string.gmatch(path, '[^/]+') do
+        table.insert(parts, p)
+    end
+    
+    local dir = nil
+
+    if string.sub(path, -1) == '/' then
+        dir = table.concat(parts, '/', 1, #parts)
+    else
+        dir = table.concat(parts, '/', 1, #parts - 1)
+    end
+
+    if string.sub(path, 1, 1) == '/' then
+        dir = '/' .. dir
+    end
+
+    return dir
+end
+
+-- return name part of a path
+function pathutils.namepart(path)
+    local parts = { }
+    for p in string.gmatch(path, '[^/]+') do
+        table.insert(parts, p)
+    end
+    
+    -- if the last item isn't followed by a /, then it's a name
+    if string.sub(path, -1) ~= '/' then
+        return parts[#parts]
+    end
+
+    -- otherwise there is no name part
+    return ''
+end
+
+-- splits nix style foo:bar:baz path string
+function splitPathString(str)
+    local parts = { }
+    for p in string.gmatch(str, '[^:]+') do
+        table.insert(parts, p)
+    end
+
+    return parts
+end
+
+function printPs()
+    local ps = pwd .. '>'
+    term.write(ps)
+    local x, y = term.getCursorPos()
+    term.setCursorPos(#ps + 2, y)
+end
+
+-- todo
+function escapeForPattern(text)
+    return text
+end
+
+-- expand path similar to glob
+function expand(pwd, text)
+    --print('pwd: ' .. pwd .. ' text: ' .. text)
+    -- if text is an absolute path, change pwd into that
+    if pathutils.isAbsolute(text) then
+        --print('abs, '..pathutils.dirpart(text))
+        local absResults = expand(pathutils.dirpart(text), pathutils.namepart(text))
+        return absResults
+    end
+
+    -- if what we're expanding is a dir, but it doesn't end in /,
+    -- just expand the /, otherwise expand from inside it
+    local pwdText = pathutils.combine(pwd, text)
+    if text ~= '' and fs.isDir(pwdText) then
+        if string.sub(pwdText, -1) ~= '/' then
+            --print 'prefix'
+            return { pwdText  .. '/' }
+        end
+
+        --print 'Expanding from dir'
+        local dirResults = expand(pwdText, '')
+
+        for i = 1, #dirResults do
+            dirResults[i] = pwdText .. dirResults[i]
+        end
+
+        return dirResults
+    end
+
+    --print('Expanding pwd: ' .. pwd .. ' text: ' .. text)
+
+    -- nothing to expand, print all options by default
+    local pwdItems = fs.list(pwd)
+    if #text == 0 then
+        for i = 1, #pwdItems do
+            pwdItems[i] = pathutils.combine(pwd, pwdItems[i])
+        end
+        return pwdItems
+    end
+
+    local matches = { }
+    text = escapeForPattern(text)
+
+    -- begin by expanding from pwd
+    for _, v in ipairs(pwdItems) do
+        if string.match(v, '^' .. text) then
+            if fs.isDir(v) then
+                v = v .. '/'
+            end
+
+            table.insert(matches, pathutils.combine(pwd, v))
+        end
+    end
+
+    -- expand further from pwd too
+    -- ^ TODO
+
+    return matches
+end
+
+--print(table.concat(expand('/', '/'), ' '))
+--print(table.concat(expand('/', '/rom'), ' '))
+--print(table.concat(expand('/', '/rom/programs'), ' '))
+--print(table.concat(expand('/', '/rom/'), ' '))
+--print(table.concat(expand('/', '/rom/programs/'), ' '))
+--print(pathutils.dirpart('/rom/'))
+--print(pathutils.dirpart('/rom'))
+--print(pathutils.dirpart('rom'))
+--print(pathutils.dirpart('rom/'))
+--print(pathutils.namepart('/rom/'))
+
+-- for the builtin shell-related funcs to work, override
+-- the shell api for any applications that are being run
+local baseEnv = getfenv()
+
+local shcompat = { }
+for k, v in pairs(baseEnv.shell) do
+    shcompat[k] = v
+end
+
+shcompat.resolve = function(path)
+    if pathutils.isAbsolute(path) then
+        return fs.combine('', path)
+    end
+
+    return fs.combine(pwd, path)
+end
+
+shcompat.setDir = function(path)
+    pwd = path
+end
+
+shcompat.resolveProgram = function(command)
+    if pathutils.isAbsolute(command) then
+        local fspath = fs.combine('', command)
+        if fs.exists(fspath) and not fs.isDir(fspath) then
+            return fspath
+        end
+
+        return nil
+    end
+
+    local paths = splitPathString(binPaths)
+    for _, v in pairs(paths) do
+        v = fs.combine(shcompat.resolve(v), command)
+        if fs.exists(v) and not fs.isDir(v) then
+            return v
+        end
+    end
+
+    return nil
+end
+
+shcompat.dir = function()
+    return pwd
+end
+
+shcompat.run = function(command, ...)
+    local p = shcompat.resolveProgram(command)
+    if p then
+        local result = os.run({ shell = shcompat }, p, ...)
+        return result
+    end
+
+    print('Command not found: ' .. command)
+    return false
+end
+
+local run = true
+
+shcompat.exit = function()
+    run = false
+end
+
+local history = { }
+while run do
+    printPs()
+    
+    local ret = false
+    local line = ''
+    term.setCursorBlink(true)
+    -- This reads keys in a similar way as read(), but supports
+    -- getting key events such as tab key
+    while not ret do
+        local e, v = os.pullEvent()
+        -- we only care about key and char
+        if e == 'key' then
+            if v == KEYS.ENTER then
+                ret = true
+                write("\n")
+            elseif v == KEYS.BACKSPACE then
+                if #line > 0 then
+                    local x, y = term.getCursorPos()
+                    term.setCursorPos(x - 1, y)
+                    write(' ')
+                    line = string.sub(line, 1, #line - 1)
+                    term.setCursorPos(x - 1, y)
+                end
+            elseif v == KEYS.TAB then
+                local split = { }
+                for m in string.gmatch(line, '[^ \t]+') do
+                    table.insert(split, m)
+                end
+
+                local last = split[#split]
+                local opts = expand(pwd, last)
+                if #opts == 1 then
+                    local x, y = term.getCursorPos()
+                    term.setCursorPos(x - #last, y)
+                    write(opts[1])
+                    line = string.sub(line, 1, #line - #last) .. opts[1]
+                elseif #opts > 1 then
+                    local x, y = term.getCursorPos()
+                    --term.setCursorPos(1, y + 1)
+                    write('\n')
+                    for _, v in ipairs(opts) do
+                        print(v)
+                    end
+
+                    printPs()
+                    write(line)
+                end
+            else
+                --print(v)
+            end
+        elseif e == 'char' then
+            line = line .. v
+            write(v)
+        end
+    end
+
+    term.setCursorBlink(false)
+    table.insert(history, line)
+
+    local parts = { }
+    for m in string.gmatch(line, '[^ \t]+') do
+        table.insert(parts, m)
+    end
+
+    if parts[1] then
+        shcompat.run(parts[1], unpack(parts, 2))
+    end
+end
