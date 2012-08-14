@@ -7,7 +7,11 @@ local KEYS = {
     ENTER = 28,
     LCTRL = 29,
     RCTRL = 157,
-    BACKSPACE = 14
+    BACKSPACE = 14,
+    UP = 200,
+    DOWN = 208,
+    LEFT = 203,
+    RIGHT = 205
 }
 
 local pathutils = { }
@@ -353,10 +357,12 @@ while run do
                         local x, y = term.getCursorPos()
                         --term.setCursorPos(1, y + 1)
                         write('\n')
+                        local list = { }
                         for _, v in ipairs(opts) do
-                            print(v)
+                            table.insert(list, pathutils.namepart(v))
                         end
 
+                        print(textutils.tabulate(list))
                         line:print()
                     end
                 end
