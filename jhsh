@@ -227,12 +227,99 @@ shcompat.exit = function()
     run = false
 end
 
+jhsh = { }
+
+local cmdline = { }
+
+function cmdline:new(prefix)
+    local cmdline = { }
+    setmetatable(cmdline, self)
+    self.__index = self
+    self.prefix = prefix
+    self.xOffset = #self.prefix + 1
+    self.command = ''
+    self.x = 1
+    return cmdline
+end
+
+function cmdline:print()
+    write(self.prefix .. ' ' .. self.command)
+end
+
+function cmdline:move(x)
+    -- don't allow line to go past last part of command
+    if self.x + x > #self.command + 1 then
+        return
+    end
+
+    local newX = self.x + x 
+    
+    -- adjust moves so that we never move past the start
+    if newX < 1 then
+        x = (self.x - 1) * -1
+        newX = self.x + x
+    end
+
+    self.x = newX
+
+    local x, y = term.getCursorPos()
+    term.setCursorPos(self.x + self.xOffset, y)
+end
+
+function cmdline:redraw()
+    term.clearLine()
+    local x, y = term.getCursorPos()
+    term.setCursorPos(1, y)
+    self:print()
+    term.setCursorPos(self.xOffset + self.x, y)
+end
+
+function cmdline:erase()
+    -- can't erase if at start
+    if self.x == 1 then
+        return
+    end
+
+    local p1 = string.sub(self.command, 1, self.x - 2)
+    local p2 = string.sub(self.command, self.x)
+
+    self.command = p1 .. p2
+    self:move(-1)
+    self:redraw()
+end
+
+function cmdline:append(text)
+    if self.x > #self.command then
+        -- if beyond the last char, we can just append to the end
+        self.command = self.command .. text
+    else
+        -- otherwise need to split at cursor pos and insert in between
+        local p1 = string.sub(self.command, 1, self.x - 1)
+        local p2 = string.sub(self.command, self.x)
+
+        self.command = p1 .. text .. p2
+    end
+
+    self.x = self.x + #text
+    self:redraw()
+end
+
+function cmdline:setCommand(cmd)
+    self.command = cmd
+    self.x = #self.command + 1
+end
+
+function cmdline:getCommand()
+    return self.command
+end
+
+jhsh.cmdline = cmdline
+
 local history = { }
 while run do
-    printPs()
-    
     local ret = false
-    local line = ''
+    local line = cmdline:new(pwd .. '>')
+    line:print()
     term.setCursorBlink(true)
     -- This reads keys in a similar way as read(), but supports
     -- getting key events such as tab key
@@ -244,16 +331,14 @@ while run do
                 ret = true
                 write("\n")
             elseif v == KEYS.BACKSPACE then
-                if #line > 0 then
-                    local x, y = term.getCursorPos()
-                    term.setCursorPos(x - 1, y)
-                    write(' ')
-                    line = string.sub(line, 1, #line - 1)
-                    term.setCursorPos(x - 1, y)
-                end
+                line:erase()
+            elseif v == KEYS.LEFT then
+                line:move(-1)
+            elseif v == KEYS.RIGHT then
+                line:move(1)
             elseif v == KEYS.TAB then
                 local split = { }
-                for m in string.gmatch(line, '[^ \t]+') do
+                for m in string.gmatch(line:getCommand(), '[^ \t]+') do
                     table.insert(split, m)
                 end
 
@@ -261,10 +346,8 @@ while run do
                 if last then
                     local opts = expand(pwd, last)
                     if #opts == 1 then
-                        local x, y = term.getCursorPos()
-                        term.setCursorPos(x - #last, y)
-                        write(opts[1])
-                        line = string.sub(line, 1, #line - #last) .. opts[1]
+                        line:setCommand(opts[1])
+                        line:redraw()
                     elseif #opts > 1 then
                         local x, y = term.getCursorPos()
                         --term.setCursorPos(1, y + 1)
@@ -273,24 +356,22 @@ while run do
                             print(v)
                         end
 
-                        printPs()
-                        write(line)
+                        line:print()
                     end
                 end
             else
                 --print(v)
             end
         elseif e == 'char' then
-            line = line .. v
-            write(v)
+            line:append(v)
         end
     end
 
     term.setCursorBlink(false)
-    table.insert(history, line)
+    table.insert(history, line:getCommand())
 
     local parts = { }
-    for m in string.gmatch(line, '[^ \t]+') do
+    for m in string.gmatch(line:getCommand(), '[^ \t]+') do
         table.insert(parts, m)
     end
 
