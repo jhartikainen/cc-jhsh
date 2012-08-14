@@ -337,8 +337,9 @@ while run do
             elseif v == KEYS.RIGHT then
                 line:move(1)
             elseif v == KEYS.TAB then
+                local cmd = line:getCommand()
                 local split = { }
-                for m in string.gmatch(line:getCommand(), '[^ \t]+') do
+                for m in string.gmatch(cmd, '[^ \t]+') do
                     table.insert(split, m)
                 end
 
@@ -346,7 +347,7 @@ while run do
                 if last then
                     local opts = expand(pwd, last)
                     if #opts == 1 then
-                        line:setCommand(opts[1])
+                        line:setCommand(string.sub(cmd, 1, #cmd - #last) .. opts[1])
                         line:redraw()
                     elseif #opts > 1 then
                         local x, y = term.getCursorPos()
