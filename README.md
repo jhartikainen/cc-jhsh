@@ -11,14 +11,31 @@ Currently working features:
   - History (similar to how it works in the default shell)
   - Editing the text on the command line
   - Most programs should run like in the normal CC shell
+  - Basic globbing (Currently supports *, behaves similar to *nix shells, see below)
 
 Planned features:
 
   - History search (bash ctrl-r style)
-  - Basic globbing
 
 Possible features at some point:
 
   - Piping
   - Output and input redirection
 
+Globbing
+--------
+
+The globbing functionality behaves in a similar way as globbing does in *nix shells.
+
+If you run the following command:
+
+    cp *.jpg foo
+
+It will get expanded into
+
+    cp file1.jpg file2.jpg file3.jpg foo
+
+Assuming the directory contains file1, file2 and file3.
+
+So in order to make your application compatibles with globbing, you will need to have multi parameter
+arguments similar to how most *nix utils do. (Or you can use the expand function in jhsh directly)

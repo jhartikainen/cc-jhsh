@@ -128,21 +128,19 @@ function expand(pwd, text)
 
     --print('Expanding pwd: ' .. pwd .. ' text: ' .. text)
 
-    -- nothing to expand, print all options by default
     local pwdItems = fs.list(pwd)
-    if #text == 0 then
-        for i = 1, #pwdItems do
-            pwdItems[i] = pathutils.combine(pwd, pwdItems[i])
-        end
-        return pwdItems
-    end
 
     local matches = { }
-    text = escapeForPattern(text)
+    local patternText = string.gsub(text, '*', '.*')
+    if patternText == text then
+        -- if converting text into pattern did nothing,
+        -- then there were no globbing characters in it
+        return { }
+    end
 
     -- begin by expanding from pwd
     for _, v in ipairs(pwdItems) do
-        if string.match(v, '^' .. text) then
+        if string.match(v, '^' .. patternText) then
             if fs.isDir(v) then
                 v = v .. '/'
             end
@@ -150,9 +148,6 @@ function expand(pwd, text)
             table.insert(matches, pathutils.combine(pwd, v))
         end
     end
-
-    -- expand further from pwd too
-    -- ^ TODO
 
     return matches
 end
@@ -368,7 +363,7 @@ while run do
 
                 local last = split[#split]
                 if last then
-                    local opts = expand(pwd, last)
+                    local opts = expand(pwd, escapeForPattern(last) .. '*')
                     if #opts == 1 then
                         line:setCommand(string.sub(cmd, 1, #cmd - #last) .. opts[1])
                         line:redraw()
@@ -397,8 +392,17 @@ while run do
     table.insert(history, line:getCommand())
 
     local parts = { }
+    -- put each part in a table so we get the command and any args,
+    -- and can also try expanding them for globbing
     for m in string.gmatch(line:getCommand(), '[^ \t]+') do
-        table.insert(parts, m)
+        local expandResult = expand(pwd, m), ' '
+        if #expandResult == 0 then
+            table.insert(parts, m)
+        else
+            for i = 1, #expandResult do
+                table.insert(parts, expandResult[i])
+            end
+        end
     end
 
     if parts[1] then
