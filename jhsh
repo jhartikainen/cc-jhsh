@@ -258,22 +258,24 @@ while run do
                 end
 
                 local last = split[#split]
-                local opts = expand(pwd, last)
-                if #opts == 1 then
-                    local x, y = term.getCursorPos()
-                    term.setCursorPos(x - #last, y)
-                    write(opts[1])
-                    line = string.sub(line, 1, #line - #last) .. opts[1]
-                elseif #opts > 1 then
-                    local x, y = term.getCursorPos()
-                    --term.setCursorPos(1, y + 1)
-                    write('\n')
-                    for _, v in ipairs(opts) do
-                        print(v)
-                    end
+                if last then
+                    local opts = expand(pwd, last)
+                    if #opts == 1 then
+                        local x, y = term.getCursorPos()
+                        term.setCursorPos(x - #last, y)
+                        write(opts[1])
+                        line = string.sub(line, 1, #line - #last) .. opts[1]
+                    elseif #opts > 1 then
+                        local x, y = term.getCursorPos()
+                        --term.setCursorPos(1, y + 1)
+                        write('\n')
+                        for _, v in ipairs(opts) do
+                            print(v)
+                        end
 
-                    printPs()
-                    write(line)
+                        printPs()
+                        write(line)
+                    end
                 end
             else
                 --print(v)
