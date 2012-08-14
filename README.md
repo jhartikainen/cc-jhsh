@@ -37,5 +37,5 @@ It will get expanded into
 
 Assuming the directory contains file1, file2 and file3.
 
-So in order to make your application compatibles with globbing, you will need to have multi parameter
+So in order to make your application compatible with globbing, you will need to have multi parameter
 arguments similar to how most *nix utils do. (Or you can use the expand function in jhsh directly)
