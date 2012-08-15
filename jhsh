@@ -119,25 +119,6 @@ function pathutils.expand(pwd, text)
         return absResults
     end
 
-    -- if what we're expanding is a dir, but it doesn't end in /,
-    -- just expand the /, otherwise expand from inside it
-    local pwdText = pathutils.combine(pwd, text)
-    if text ~= '' and fs.isDir(pwdText) then
-        if string.sub(pwdText, -1) ~= '/' then
-            --print 'prefix'
-            return { pwdText  .. '/' }
-        end
-
-        --print 'Expanding from dir'
-        local dirResults = pathutils.expand(pwdText, '')
-
-        for i = 1, #dirResults do
-            dirResults[i] = pwdText .. dirResults[i]
-        end
-
-        return dirResults
-    end
-
     --print('Expanding pwd: ' .. pwd .. ' text: ' .. text)
 
     local pwdItems = fs.list(pwd)
@@ -153,10 +134,6 @@ function pathutils.expand(pwd, text)
     -- begin by expanding from pwd
     for _, v in ipairs(pwdItems) do
         if string.match(v, '^' .. patternText) then
-            if fs.isDir(v) then
-                v = v .. '/'
-            end
-
             table.insert(matches, pathutils.combine(pwd, v))
         end
     end
@@ -456,8 +433,6 @@ while run do
                         line:setCommand(string.sub(cmd, 1, #cmd - #last) .. expandedCmd)
                         line:redraw()
                     elseif #opts > 1 then
-                        local x, y = term.getCursorPos()
-                        --term.setCursorPos(1, y + 1)
                         write('\n')
                         local list = { }
                         for _, v in ipairs(opts) do
