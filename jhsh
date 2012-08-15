@@ -421,7 +421,15 @@ while run do
 
                 local last = split[#split]
                 if last then
-                    local opts = pathutils.expand(pwd, escapeForPattern(last) .. '*')
+                    local opts = nil
+                    -- if the item is a dir and doesn't end in a /, just expand the /
+                    if fs.isDir(shcompat.resolve(last)) and string.sub(last, -1) ~= '/' then
+                        opts = { last .. '/' }
+                    else
+                        -- otherwise full globbing
+                        opts = pathutils.expand(pwd, escapeForPattern(last) .. '*')
+                    end
+
                     if #opts == 1 then
                         -- since expand results are always absolute, remove current pwd
                         -- from result if command is not absolute
