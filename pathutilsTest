@@ -11,6 +11,8 @@ local testDirs = {
     ['/'] = { 'disk', 'rom' },
     ['/disk'] = { 'diskItem1', 'diskItem2' },
     ['/rom'] = { 'foo.bar', 'bar.foo' },
+    ['/rom/programs'] = { 'test.lua', 'test2.lua' },
+    ['rom/programs'] = { 'test.lua', 'test2.lua' },
     ['rom'] = { 'foo.bar', 'bar.foo' }
 }
 
@@ -25,7 +27,7 @@ envExpand.fs.list = function(path)
 end
 
 envExpand.fs.isDir = function(path)
-    return path == '/disk' or path == '/rom'
+    return path == '/disk' or path == '/rom' or path == '/rom/programs' or path == '/rom/programs/'
 end
 
 setfenv(p.expand, envExpand)
@@ -51,6 +53,10 @@ local tests = {
 
         function()
             assertEquals(table.concat(p.expand('/', 'rom/*'), ' '), '/rom/foo.bar /rom/bar.foo', 'root with relative path expansion')
+        end,
+
+        function()
+            assertEquals(table.concat(p.expand('/', 'rom/programs/'), ''), '', 'no glob relative path from root')
         end,
 
         function() 

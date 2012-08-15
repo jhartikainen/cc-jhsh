@@ -39,11 +39,20 @@ function pathutils.combine(a, b)
         a = string.sub(a, 1, #a - 1)
     end
 
-    if string.sub(b, 1) == '/' then
+    if string.sub(b, 1, 1) == '/' then
         b = string.sub(b, 2)
     end
 
     return a .. '/' .. b
+end
+
+-- normalize a path into a form with no trailing /
+function pathutils.normalize(path)
+    if string.sub(path, -1) == '/' then
+        return string.sub(path, 1, #path - 1)
+    end
+
+    return path
 end
 
 -- return directory part of a path
@@ -111,18 +120,10 @@ function pathutils.expand(pwd, text)
         pwd = '/' .. pwd
     end
 
-    --print('pwd: ' .. pwd .. ' text: ' .. text)
-    -- if text is an absolute path, change pwd into that
-    if pathutils.isAbsolute(text) then
-        --print('abs, '..pathutils.dirpart(text))
-        local absResults = pathutils.expand(pathutils.dirpart(text), pathutils.namepart(text))
-        return absResults
-    end
-
     -- if the path consists of a valid dir, change pwd into that so we can
     -- correctly expand files from that dir
     local pwdPath = pathutils.combine(pwd, pathutils.dirpart(text))
-    if pwdPath ~= pwd and fs.isDir(pwdPath) then
+    if pathutils.normalize(pwdPath) ~= pathutils.normalize(pwd) and fs.isDir(pwdPath) then
         return pathutils.expand(pwdPath, pathutils.namepart(text))
     end
     --print('Expanding pwd: ' .. pwd .. ' text: ' .. text)
@@ -476,7 +477,7 @@ while run do
     -- put each part in a table so we get the command and any args,
     -- and can also try expanding them for globbing
     for m in string.gmatch(line:getCommand(), '[^ \t]+') do
-        local expandResult = pathutils.expand(pwd, m), ' '
+        local expandResult = pathutils.expand(pwd, m)
         if #expandResult == 0 then
             table.insert(parts, m)
         else
