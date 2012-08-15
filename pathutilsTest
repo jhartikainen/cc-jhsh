@@ -1,0 +1,77 @@
+-- tests for pathutils stuff. 
+-- may require rebooting the CC computer after running
+os.loadAPI(shell.dir() .. '/jhsh')
+
+local args = { ... }
+
+local p = jhsh.pathutils
+
+-- available files in paths for tests
+local testDirs = {
+    ['/'] = { 'disk', 'rom' },
+    ['/disk'] = { 'diskItem1', 'diskItem2' },
+    ['/rom'] = { 'foo.bar', 'bar.foo' },
+    ['rom'] = { 'foo.bar', 'bar.foo' }
+}
+
+-- mock out fs funcs for expand tests
+local envExpand = getfenv(p.expand)
+envExpand.fs.list = function(path)
+    if testDirs[path] then
+        return testDirs[path]
+    end
+
+    error('Unexpected directory ' .. path)
+end
+
+setfenv(p.expand, envExpand)
+
+function assertEquals(a, b, msg)
+    if a == b then
+        return
+    end
+
+    print('Assertion failed! "' .. tostring(a) .. '" does not equal "' .. tostring(b) .. '"')
+    error(msg)
+end
+
+local tests = {
+    expand = {
+        function() 
+            assertEquals(table.concat(p.expand('/', '')), '', 'root test')
+        end,
+
+        function() 
+            assertEquals(table.concat(p.expand('/disk', '*'), ' '), '/disk/diskItem1 /disk/diskItem2', 'disk test') 
+        end,
+
+        function()
+            assertEquals(table.concat(p.expand('/', '/disk/*'), ' '), '/disk/diskItem1 /disk/diskItem2', 'disk test from root')
+        end,
+
+        function()
+            assertEquals(table.concat(p.expand('/rom', 'foo*'), ' '), '/rom/foo.bar', 'rom test')
+        end,
+
+        function()
+            assertEquals(table.concat(p.expand('/rom', '*foo'), ' '), '/rom/bar.foo', '* before name test')
+        end,
+
+        function()
+            assertEquals(table.concat(p.expand('rom', 'foo*'), ' '), '/rom/foo.bar', 'no slash test')
+        end
+    }
+}
+
+if args[1] then
+    if not args[2] then
+        for _, v in pairs(tests[args[1]]) do
+            v()
+        end
+
+        print('Ran ' .. #tests[args[1]] .. ' test(s) OK')
+    else
+        tests[args[1]][args[2]]()
+        print 'Ran 1 test OK'
+    end
+end

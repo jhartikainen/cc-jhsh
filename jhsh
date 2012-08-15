@@ -14,9 +14,17 @@ local KEYS = {
     RIGHT = 205
 }
 
-local pathutils = { }
+pathutils = { }
 function pathutils.isAbsolute(path)
     return string.sub(path, 1, 1) == '/'
+end
+
+function pathutils.normalizeAbsolutePath(path)
+    if string.sub(path, 1, 1) ~= '/' then
+        return '/' .. path
+    end
+    
+    return path
 end
 
 -- fs.combine-like function which doesn't mess with things too much
@@ -98,12 +106,17 @@ function escapeForPattern(text)
 end
 
 -- expand path similar to glob
-function expand(pwd, text)
+function pathutils.expand(pwd, text)
+    -- always have slash for paths even with borky no-slash absolute paths
+    if string.sub(pwd, 1, 1) ~= '/' then
+        pwd = '/' .. pwd
+    end
+
     --print('pwd: ' .. pwd .. ' text: ' .. text)
     -- if text is an absolute path, change pwd into that
     if pathutils.isAbsolute(text) then
         --print('abs, '..pathutils.dirpart(text))
-        local absResults = expand(pathutils.dirpart(text), pathutils.namepart(text))
+        local absResults = pathutils.expand(pathutils.dirpart(text), pathutils.namepart(text))
         return absResults
     end
 
@@ -117,7 +130,7 @@ function expand(pwd, text)
         end
 
         --print 'Expanding from dir'
-        local dirResults = expand(pwdText, '')
+        local dirResults = pathutils.expand(pwdText, '')
 
         for i = 1, #dirResults do
             dirResults[i] = pwdText .. dirResults[i]
@@ -131,7 +144,7 @@ function expand(pwd, text)
     local pwdItems = fs.list(pwd)
 
     local matches = { }
-    local patternText = string.gsub(text, '*', '.*')
+    local patternText = string.gsub(text, '*', '.+')
     if patternText == text then
         -- if converting text into pattern did nothing,
         -- then there were no globbing characters in it
@@ -152,11 +165,11 @@ function expand(pwd, text)
     return matches
 end
 
---print(table.concat(expand('/', '/'), ' '))
---print(table.concat(expand('/', '/rom'), ' '))
---print(table.concat(expand('/', '/rom/programs'), ' '))
---print(table.concat(expand('/', '/rom/'), ' '))
---print(table.concat(expand('/', '/rom/programs/'), ' '))
+--print(table.concat(pathutils.expand('/', '/'), ' '))
+--print(table.concat(pathutils.expand('/', '/rom'), ' '))
+--print(table.concat(pathutils.expand('/', '/rom/programs'), ' '))
+--print(table.concat(pathutils.expand('/', '/rom/'), ' '))
+--print(table.concat(pathutils.expand('/', '/rom/programs/'), ' '))
 --print(pathutils.dirpart('/rom/'))
 --print(pathutils.dirpart('/rom'))
 --print(pathutils.dirpart('rom'))
@@ -168,8 +181,11 @@ end
 local baseEnv = getfenv()
 
 local shcompat = { }
-for k, v in pairs(baseEnv.shell) do
-    shcompat[k] = v
+
+if baseEnv.shell then
+    for k, v in pairs(baseEnv.shell) do
+        shcompat[k] = v
+    end
 end
 
 shcompat.resolve = function(path)
@@ -221,6 +237,12 @@ shcompat.run = function(command, ...)
 end
 
 local run = true
+
+-- support loading as api
+-- bit hacky, should probably split into files, but this is simpler for now.
+if not shell or pathutils.namepart(shell.getRunningProgram()) ~= 'jhsh' then
+    run = false
+end
 
 shcompat.exit = function()
     run = false
@@ -363,7 +385,7 @@ while run do
 
                 local last = split[#split]
                 if last then
-                    local opts = expand(pwd, escapeForPattern(last) .. '*')
+                    local opts = pathutils.expand(pwd, escapeForPattern(last) .. '*')
                     if #opts == 1 then
                         line:setCommand(string.sub(cmd, 1, #cmd - #last) .. opts[1])
                         line:redraw()
@@ -395,7 +417,7 @@ while run do
     -- put each part in a table so we get the command and any args,
     -- and can also try expanding them for globbing
     for m in string.gmatch(line:getCommand(), '[^ \t]+') do
-        local expandResult = expand(pwd, m), ' '
+        local expandResult = pathutils.expand(pwd, m), ' '
         if #expandResult == 0 then
             table.insert(parts, m)
         else
