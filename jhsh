@@ -337,6 +337,10 @@ end
 jhsh.cmdline = cmdline
 
 local history = { }
+
+-- if pwd came from default shell, it's not in correct format
+pwd = pathutils.normalizeAbsolutePath(pwd)
+
 while run do
     local ret = false
     local line = cmdline:new(pwd .. '>')
@@ -387,7 +391,14 @@ while run do
                 if last then
                     local opts = pathutils.expand(pwd, escapeForPattern(last) .. '*')
                     if #opts == 1 then
-                        line:setCommand(string.sub(cmd, 1, #cmd - #last) .. opts[1])
+                        -- since expand results are always absolute, remove current pwd
+                        -- from result if command is not absolute
+                        local expandedCmd = opts[1]
+                        if not pathutils.isAbsolute(last) then
+                            expandedCmd = string.gsub(opts[1], '^' .. pwd .. '/', '')
+                        end
+
+                        line:setCommand(string.sub(cmd, 1, #cmd - #last) .. expandedCmd)
                         line:redraw()
                     elseif #opts > 1 then
                         local x, y = term.getCursorPos()
