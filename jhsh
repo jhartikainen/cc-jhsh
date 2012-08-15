@@ -1,6 +1,8 @@
 local baseShell = shell
 local pwd = (baseShell and baseShell.dir()) or ''
 local binPaths = '.:/rom/programs'
+local programStack = { }
+local aliases = { }
 
 local KEYS = {
     TAB = 15,
@@ -17,6 +19,10 @@ local KEYS = {
 pathutils = { }
 function pathutils.isAbsolute(path)
     return string.sub(path, 1, 1) == '/'
+end
+
+function pathutils.isHidden(path)
+    return string.sub(path, 1, 1) == '.'
 end
 
 function pathutils.normalizeAbsolutePath(path)
@@ -84,20 +90,13 @@ function pathutils.namepart(path)
 end
 
 -- splits nix style foo:bar:baz path string
-function splitPathString(str)
+function pathutils.splitPathString(str)
     local parts = { }
     for p in string.gmatch(str, '[^:]+') do
         table.insert(parts, p)
     end
 
     return parts
-end
-
-function printPs()
-    local ps = pwd .. '>'
-    term.write(ps)
-    local x, y = term.getCursorPos()
-    term.setCursorPos(#ps + 2, y)
 end
 
 -- todo
@@ -200,6 +199,14 @@ shcompat.setDir = function(path)
     pwd = path
 end
 
+function shcompat.getPath()
+    return binPaths
+end
+
+function shcompat.setPath(p)
+    binPaths = p
+end
+
 shcompat.resolveProgram = function(command)
     if pathutils.isAbsolute(command) then
         local fspath = fs.combine('', command)
@@ -210,7 +217,7 @@ shcompat.resolveProgram = function(command)
         return nil
     end
 
-    local paths = splitPathString(binPaths)
+    local paths = pathutils.splitPathString(binPaths)
     for _, v in pairs(paths) do
         v = fs.combine(shcompat.resolve(v), command)
         if fs.exists(v) and not fs.isDir(v) then
@@ -228,7 +235,9 @@ end
 shcompat.run = function(command, ...)
     local p = shcompat.resolveProgram(command)
     if p then
+        table.insert(programStack, p)
         local result = os.run({ shell = shcompat }, p, ...)
+        table.remove(programStack)
         return result
     end
 
@@ -246,6 +255,52 @@ end
 
 shcompat.exit = function()
     run = false
+end
+
+function shcompat.programs(includeHidden)
+    local items = { }
+    for _, v in pairs(pathutils.splitPathString(binPaths)) do
+        v = shcompat.resolve(v)
+        if fs.isDir(v) then
+            local list = fs.list(v)
+            for _, file in pairs(list) do
+                if not fs.isDir(fs.combine(v, file)) and 
+                    (includeHidden or not pathutils.isHidden(file)) then
+                    -- use filename as key so if we get duplicate names,
+                    -- they appear only once in the listing
+                    items[file] = true
+                end
+            end
+        end
+    end
+
+    local itemList = { }
+    for item, _ in pairs(items) do
+        table.insert(itemList, item)
+    end
+    table.sort(itemList)
+
+    return itemList
+end
+
+function shcompat.getRunningProgram()
+    if #programStack > 0 then
+        return programStack[#programStack]
+    end
+
+    return nil
+end
+
+function shcompat.aliases()
+    return aliases
+end
+
+function shcompat.setAlias(alias, command)
+    aliases[alias] = command
+end
+
+function shcompat.clearAlias(alias)
+    aliases[alias] = nil
 end
 
 jhsh = { }
