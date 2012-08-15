@@ -119,6 +119,12 @@ function pathutils.expand(pwd, text)
         return absResults
     end
 
+    -- if the path consists of a valid dir, change pwd into that so we can
+    -- correctly expand files from that dir
+    local pwdPath = pathutils.combine(pwd, pathutils.dirpart(text))
+    if pwdPath ~= pwd and fs.isDir(pwdPath) then
+        return pathutils.expand(pwdPath, pathutils.namepart(text))
+    end
     --print('Expanding pwd: ' .. pwd .. ' text: ' .. text)
 
     local pwdItems = fs.list(pwd)

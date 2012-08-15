@@ -24,6 +24,10 @@ envExpand.fs.list = function(path)
     error('Unexpected directory ' .. path)
 end
 
+envExpand.fs.isDir = function(path)
+    return path == '/disk' or path == '/rom'
+end
+
 setfenv(p.expand, envExpand)
 
 function assertEquals(a, b, msg)
@@ -39,6 +43,14 @@ local tests = {
     expand = {
         function() 
             assertEquals(table.concat(p.expand('/', '')), '', 'root test')
+        end,
+
+        function()
+            assertEquals(table.concat(p.expand('/', '*'), ' '), '/disk /rom', 'root with expansion')
+        end,
+
+        function()
+            assertEquals(table.concat(p.expand('/', 'rom/*'), ' '), '/rom/foo.bar /rom/bar.foo', 'root with relative path expansion')
         end,
 
         function() 
