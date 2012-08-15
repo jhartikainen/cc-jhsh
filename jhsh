@@ -2,7 +2,7 @@ local baseShell = shell
 local pwd = (baseShell and baseShell.dir()) or ''
 local binPaths = '.:/rom/programs'
 local programStack = { }
-local aliases = { }
+local aliases = (baseShell and baseShell.aliases()) or { }
 
 local KEYS = {
     TAB = 15,
@@ -185,6 +185,10 @@ function shcompat.setPath(p)
 end
 
 shcompat.resolveProgram = function(command)
+    if aliases[command] then
+        command = aliases[command]
+    end
+
     if pathutils.isAbsolute(command) then
         local fspath = fs.combine('', command)
         if fs.exists(fspath) and not fs.isDir(fspath) then
