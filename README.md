@@ -22,6 +22,17 @@ Possible features at some point:
   - Piping
   - Output and input redirection
 
+Running jhsh as the default CC shell
+------------------------------------
+
+The current way to replace your default shell with jhsh is as follows:
+
+  - Create a directory in `/rom` called `autorun`
+  - Place `jhsh` into `/rom/autorun`
+
+This depends on the feature of the default startup script of the OS localted in `/rom/startup` which
+runs every program in the autorun dir.
+
 Globbing
 --------
 
