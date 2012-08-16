@@ -471,12 +471,25 @@ while run do
     end
 
     term.setCursorBlink(false)
-    table.insert(history, line:getCommand())
+    local cmd = line:getCommand()
+    table.insert(history, cmd)
+
+    -- get any output redirection
+    -- using gsub to match and replace
+    local out = ''
+    local outMode = ''
+    cmd = string.gsub(cmd, '(>>?) ?([A-Za-z0-9_./]+)', function(mode, path)
+        -- currently only support one output redirection so if there's
+        -- more than one, just replace the old one
+        out = path
+        outMode = mode
+        return ''
+    end)
 
     local parts = { }
     -- put each part in a table so we get the command and any args,
     -- and can also try expanding them for globbing
-    for m in string.gmatch(line:getCommand(), '[^ \t]+') do
+    for m in string.gmatch(cmd, '[^ \t]+') do
         local expandResult = pathutils.expand(pwd, m)
         if #expandResult == 0 then
             table.insert(parts, m)
@@ -488,6 +501,39 @@ while run do
     end
 
     if parts[1] then
-        shcompat.run(parts[1], unpack(parts, 2))
+        if out ~= '' then
+            out = shcompat.resolve(out)
+
+            -- open file for output redirection in the expected mode
+            local outfile = nil
+            if outMode == '>' then
+                outfile = fs.open(out, 'w')
+            elseif outMode == '>>' then
+                outfile = fs.open(out, 'a')
+            elseif outMode ~= '' then
+                error('Unexpected output redirection operator "' .. outMode .. '"')
+            end
+
+            -- replace write with a function which outputs into the file
+            local oldWrite = write
+            local envWrite = getfenv()
+            envWrite.write = function(text)
+                outfile.write(text)
+                return 0
+            end
+
+            -- replace env for print so it uses the correct write
+            setfenv(print, envWrite)
+
+            shcompat.run(parts[1], unpack(parts, 2))
+
+            -- put old printing function back and dump output into file
+            envWrite.write = oldWrite
+            setfenv(print, envWrite)
+
+            outfile.close()
+        else
+            shcompat.run(parts[1], unpack(parts, 2))
+        end
     end
 end

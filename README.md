@@ -12,6 +12,7 @@ Currently working features:
   - Editing the text on the command line
   - Most programs should run like in the normal CC shell
   - Basic globbing (Currently supports *, behaves similar to *nix shells, see below)
+  - Output redirection to file (Similar to bash, using `foo > out` or `foo >> out`)
 
 Planned features:
 
@@ -20,7 +21,7 @@ Planned features:
 Possible features at some point:
 
   - Piping
-  - Output and input redirection
+  - Input redirection
 
 Running jhsh as the default CC shell
 ------------------------------------
