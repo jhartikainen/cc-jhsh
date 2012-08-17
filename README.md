@@ -1,5 +1,5 @@
-Improved shell for ComputerCraft
---------------------------------
+Improved shell (and shell utils) for ComputerCraft
+--------------------------------------------------
 
 This is a more advanced version of the standard ComputerCraft shell application.
 
@@ -13,6 +13,7 @@ Currently working features:
   - Most programs should run like in the normal CC shell
   - Basic globbing (Currently supports *, behaves similar to *nix shells, see below)
   - Output redirection to file (Similar to bash, using `foo > out` or `foo >> out`)
+  - An improved `cp` command which supports globbing (`cp foo.* outdir` style)
 
 Planned features:
 
@@ -33,6 +34,12 @@ The current way to replace your default shell with jhsh is as follows:
 
 This depends on the feature of the default startup script of the OS localted in `/rom/startup` which
 runs every program in the autorun dir.
+
+Installing utils
+----------------
+
+In order to install the cp utility, you can put it into your `rom/programs` dir. 
+Remember to remove the default cp alias using `alias cp` or it will use  the default `copy` command instead.
 
 Globbing
 --------
